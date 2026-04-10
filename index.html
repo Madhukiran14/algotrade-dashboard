@@ -387,7 +387,7 @@
 </head>
 <body>
 <!-- Login Modal -->
-<div id="login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:999;align-items:center;justify-content:center;backdrop-filter:blur(10px)">
+<div id="login-modal" style="display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:999;align-items:center;justify-content:center;backdrop-filter:blur(10px)">
   <div style="background:#12121a;border:1px solid #1e1e2e;border-radius:16px;padding:36px;width:360px;display:flex;flex-direction:column;gap:14px">
     <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px">Sign in to AlgoTrade</div>
     <div style="font-size:13px;color:#6b6b8a">Enter credentials to access your dashboard</div>
@@ -759,6 +759,12 @@
 const API_BASE = "http://16.171.20.111:8000";
 let API_TOKEN  = localStorage.getItem("algotrade_token") || "";
 
+// Hide modal immediately if already logged in
+(function() {
+  const modal = document.getElementById("login-modal");
+  if (API_TOKEN && modal) modal.style.display = "none";
+})();
+
 // Demo mode — works without API (for testing UI)
 const DEMO_MODE = !API_TOKEN && !API_BASE.includes("localhost");
 
@@ -884,13 +890,8 @@ function doLogout() {
 }
 
 // Show login if no token, else load data
-window.addEventListener("DOMContentLoaded", () => {
-  if (!API_TOKEN) {
-    document.getElementById("login-modal").style.display = "flex";
-  } else {
-    setTimeout(loadDashboard, 500);
-  }
-});
+// Load dashboard data if logged in
+if (API_TOKEN) setTimeout(loadDashboard, 500);
 
 // ── Page routing ─────────────────────────────────────────────
 function showPage(page) {
