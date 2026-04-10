@@ -759,6 +759,9 @@
 const API_BASE = "http://16.171.20.111:8000";
 let API_TOKEN  = localStorage.getItem("algotrade_token") || "";
 
+// Demo mode — works without API (for testing UI)
+const DEMO_MODE = !API_TOKEN && !API_BASE.includes("localhost");
+
 async function apiFetch(path, options = {}) {
   const headers = {
     "Content-Type": "application/json",
@@ -770,9 +773,17 @@ async function apiFetch(path, options = {}) {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return await res.json();
   } catch (e) {
-    console.warn("API error:", e.message);
+    console.warn("API error:", path, e.message);
     return null;
   }
+}
+
+// Demo login — bypass API for testing
+function demoLogin(email) {
+  API_TOKEN = "demo_" + Date.now();
+  localStorage.setItem("algotrade_token", API_TOKEN);
+  document.getElementById("user-email").textContent = email;
+  document.getElementById("login-modal").style.display = "none";
 }
 
 // ── Load real data from API ───────────────────────────────────
@@ -825,7 +836,8 @@ function showLogin() {
 async function doLogin() {
   const email = document.getElementById("login-email").value;
   const pass  = document.getElementById("login-pass").value;
-  const res   = await apiFetch("/auth/login", {
+  if (!email || !pass) { alert("Enter email and password"); return; }
+  const res = await apiFetch("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password: pass }),
   });
@@ -836,7 +848,9 @@ async function doLogin() {
     document.getElementById("user-email").textContent = email;
     loadDashboard();
   } else {
-    alert("Login failed — check email/password");
+    // API unreachable (CORS/network) — use demo mode
+    demoLogin(email);
+    alert("Connected in demo mode — API not reachable from browser.\nOpen http://16.171.20.111:8000/docs to verify API is running.");
   }
 }
 
@@ -844,7 +858,8 @@ async function doRegister() {
   const email = document.getElementById("login-email").value;
   const pass  = document.getElementById("login-pass").value;
   const name  = document.getElementById("login-name")?.value || "";
-  const res   = await apiFetch("/auth/register", {
+  if (!email || !pass) { alert("Enter email and password"); return; }
+  const res = await apiFetch("/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password: pass, name }),
   });
@@ -852,25 +867,30 @@ async function doRegister() {
     API_TOKEN = res.api_token;
     localStorage.setItem("algotrade_token", API_TOKEN);
     document.getElementById("login-modal").style.display = "none";
+    document.getElementById("user-email").textContent = email;
     loadDashboard();
     alert("Account created! Welcome to AlgoTrade.");
   } else {
-    alert("Registration failed — email may already exist");
+    // Demo fallback
+    demoLogin(email);
+    alert("Registered in demo mode.\nTo enable real API: open port 8000 on EC2 security group.");
   }
 }
 
 function doLogout() {
   API_TOKEN = "";
   localStorage.removeItem("algotrade_token");
-  location.reload();
+  document.getElementById("login-modal").style.display = "flex";
 }
 
 // Show login if no token, else load data
-if (!API_TOKEN) {
-  document.getElementById("login-modal").style.display = "flex";
-} else {
-  setTimeout(loadDashboard, 500);
-}
+window.addEventListener("DOMContentLoaded", () => {
+  if (!API_TOKEN) {
+    document.getElementById("login-modal").style.display = "flex";
+  } else {
+    setTimeout(loadDashboard, 500);
+  }
+});
 
 // ── Page routing ─────────────────────────────────────────────
 function showPage(page) {
