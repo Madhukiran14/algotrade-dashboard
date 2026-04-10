@@ -446,7 +446,7 @@
       <span class="nav-label">Plans</span>
     </div>
     <div style="flex:1"></div>
-    <div class="nav-item" style="color:var(--red)" onclick="doLogout()">
+    <div class="nav-item" style="color:var(--red)" onclick="(function(){localStorage.removeItem('algotrade_token');location.reload();})()">
       <span class="nav-icon">→</span>
       <span class="nav-label">Logout</span>
     </div>
