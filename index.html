@@ -395,8 +395,8 @@
     <input id="login-email" type="email" placeholder="Email address" style="background:#0a0a0f;border:1px solid #1e1e2e;color:#e8e8f0;padding:10px 14px;border-radius:8px;font-size:13px;width:100%">
     <input id="login-pass" type="password" placeholder="Password" style="background:#0a0a0f;border:1px solid #1e1e2e;color:#e8e8f0;padding:10px 14px;border-radius:8px;font-size:13px;width:100%">
     <div style="display:flex;gap:10px">
-      <button onclick="doLogin()" style="flex:1;padding:10px;background:#7c6cfc;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Sign In</button>
-      <button onclick="doRegister()" style="flex:1;padding:10px;background:transparent;color:#7c6cfc;border:1px solid rgba(124,108,252,0.3);border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Register</button>
+      <button id="btn-login" style="flex:1;padding:10px;background:#7c6cfc;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Sign In</button>
+      <button id="btn-register" style="flex:1;padding:10px;background:transparent;color:#7c6cfc;border:1px solid rgba(124,108,252,0.3);border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Register</button>
     </div>
     <div style="font-size:11px;color:#6b6b8a;text-align:center">API keys are encrypted and never visible after saving</div>
   </div>
@@ -893,6 +893,19 @@ function doLogout() {
 // Load dashboard data if logged in
 if (API_TOKEN) setTimeout(loadDashboard, 500);
 
+// ── Attach login button events after DOM ready ───────────────
+function attachLoginButtons() {
+  const btnLogin    = document.getElementById("btn-login");
+  const btnRegister = document.getElementById("btn-register");
+  if (btnLogin)    btnLogin.addEventListener("click",    doLogin);
+  if (btnRegister) btnRegister.addEventListener("click", doRegister);
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", attachLoginButtons);
+} else {
+  attachLoginButtons();
+}
+
 // ── Page routing ─────────────────────────────────────────────
 function showPage(page) {
   document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
@@ -931,4 +944,12 @@ const signals = [
 let si = 0;
 setInterval(() => {
   si = (si + 1) % signals.length;
-  const bar = document.getElementById('live-signal-b
+  const bar = document.getElementById('live-signal-bar');
+  if (bar && bar.style.display !== 'none') {
+    bar.querySelector('.signal-label').textContent = signals[si].label;
+    bar.querySelector('.signal-sub').textContent   = signals[si].sub;
+  }
+}, 5000);
+</script>
+</body>
+</html>
