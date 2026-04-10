@@ -386,6 +386,22 @@
 </style>
 </head>
 <body>
+<!-- Login Modal -->
+<div id="login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:999;align-items:center;justify-content:center;backdrop-filter:blur(10px)">
+  <div style="background:#12121a;border:1px solid #1e1e2e;border-radius:16px;padding:36px;width:360px;display:flex;flex-direction:column;gap:14px">
+    <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px">Sign in to AlgoTrade</div>
+    <div style="font-size:13px;color:#6b6b8a">Enter credentials to access your dashboard</div>
+    <input id="login-name" placeholder="Your name (registration only)" style="background:#0a0a0f;border:1px solid #1e1e2e;color:#e8e8f0;padding:10px 14px;border-radius:8px;font-size:13px;width:100%">
+    <input id="login-email" type="email" placeholder="Email address" style="background:#0a0a0f;border:1px solid #1e1e2e;color:#e8e8f0;padding:10px 14px;border-radius:8px;font-size:13px;width:100%">
+    <input id="login-pass" type="password" placeholder="Password" style="background:#0a0a0f;border:1px solid #1e1e2e;color:#e8e8f0;padding:10px 14px;border-radius:8px;font-size:13px;width:100%">
+    <div style="display:flex;gap:10px">
+      <button onclick="doLogin()" style="flex:1;padding:10px;background:#7c6cfc;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Sign In</button>
+      <button onclick="doRegister()" style="flex:1;padding:10px;background:transparent;color:#7c6cfc;border:1px solid rgba(124,108,252,0.3);border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Register</button>
+    </div>
+    <div style="font-size:11px;color:#6b6b8a;text-align:center">API keys are encrypted and never visible after saving</div>
+  </div>
+</div>
+
 <div class="blob blob-1"></div>
 <div class="blob blob-2"></div>
 
@@ -399,7 +415,7 @@
     <div class="topbar-right">
       <span id="live-time" style="font-family:var(--mono);font-size:12px;color:var(--muted)"></span>
       <span class="plan-badge plan-premium" id="plan-badge">Premium</span>
-      <span style="font-size:13px;color:var(--muted)" id="user-email">madhu@email.com</span>
+      <span style="font-size:13px;color:var(--muted)" id="user-email"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="335e52575b4673565e525a5f1d505c5e">[email&#160;protected]</a></span>
     </div>
   </header>
 
@@ -430,7 +446,7 @@
       <span class="nav-label">Plans</span>
     </div>
     <div style="flex:1"></div>
-    <div class="nav-item" style="color:var(--red)" onclick="alert('Logout')">
+    <div class="nav-item" style="color:var(--red)" onclick="doLogout()">
       <span class="nav-icon">→</span>
       <span class="nav-label">Logout</span>
     </div>
@@ -738,8 +754,125 @@
   </main>
 </div>
 
-<script>
-// Page routing
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ── API Configuration ─────────────────────────────────────────
+const API_BASE = "http://16.171.20.111:8000";
+let API_TOKEN  = localStorage.getItem("algotrade_token") || "";
+
+async function apiFetch(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(API_TOKEN ? { "Authorization": `Bearer ${API_TOKEN}` } : {}),
+    ...(options.headers || {}),
+  };
+  try {
+    const res = await fetch(API_BASE + path, { ...options, headers });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return await res.json();
+  } catch (e) {
+    console.warn("API error:", e.message);
+    return null;
+  }
+}
+
+// ── Load real data from API ───────────────────────────────────
+async function loadDashboard() {
+  if (!API_TOKEN) return;  // not logged in — show mock data
+
+  // Load dashboard stats
+  const dash = await apiFetch("/dashboard");
+  if (dash) {
+    // Update stat cards with real data
+    const cards = document.querySelectorAll(".stat-value");
+    if (cards[0]) cards[0].textContent = `+₹${dash.today_pnl?.toLocaleString() || 0}`;
+    if (cards[1]) cards[1].textContent = dash.win_rate || "–";
+    if (cards[2]) cards[2].textContent = dash.total_trades || 0;
+  }
+
+  // Load recent trades
+  const trades = await apiFetch("/trades?limit=10");
+  if (trades && trades.length > 0) {
+    const tbody = document.getElementById("trades-table-body");
+    tbody.innerHTML = trades.map(t => `
+      <tr>
+        <td>${t.symbol}</td>
+        <td class="${t.side === 'buy' ? 'side-buy' : 'side-sell'}">${t.side.toUpperCase()}</td>
+        <td>${t.entry_price}</td>
+        <td>${t.exit_price || '–'}</td>
+        <td class="${(t.pnl || 0) >= 0 ? 'pnl-pos' : 'pnl-neg'}">${t.pnl ? (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(2) : '–'}</td>
+        <td style="color:var(--muted);font-size:11px">${t.reason || '–'}</td>
+        <td style="color:var(--muted)">${t.opened_at?.substring(11,16) || ''}</td>
+      </tr>
+    `).join("");
+  }
+
+  // Load user info
+  const me = await apiFetch("/auth/me");
+  if (me) {
+    document.getElementById("user-email").textContent = me.email || "";
+    const badge = document.getElementById("plan-badge");
+    badge.textContent = me.plan?.toUpperCase() || "FREE";
+    badge.className = `plan-badge plan-${me.plan || 'free'}`;
+  }
+}
+
+// ── Login/Register modal ──────────────────────────────────────
+function showLogin() {
+  const modal = document.getElementById("login-modal");
+  if (modal) modal.style.display = "flex";
+}
+
+async function doLogin() {
+  const email = document.getElementById("login-email").value;
+  const pass  = document.getElementById("login-pass").value;
+  const res   = await apiFetch("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: pass }),
+  });
+  if (res?.api_token) {
+    API_TOKEN = res.api_token;
+    localStorage.setItem("algotrade_token", API_TOKEN);
+    document.getElementById("login-modal").style.display = "none";
+    document.getElementById("user-email").textContent = email;
+    loadDashboard();
+  } else {
+    alert("Login failed — check email/password");
+  }
+}
+
+async function doRegister() {
+  const email = document.getElementById("login-email").value;
+  const pass  = document.getElementById("login-pass").value;
+  const name  = document.getElementById("login-name")?.value || "";
+  const res   = await apiFetch("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password: pass, name }),
+  });
+  if (res?.api_token) {
+    API_TOKEN = res.api_token;
+    localStorage.setItem("algotrade_token", API_TOKEN);
+    document.getElementById("login-modal").style.display = "none";
+    loadDashboard();
+    alert("Account created! Welcome to AlgoTrade.");
+  } else {
+    alert("Registration failed — email may already exist");
+  }
+}
+
+function doLogout() {
+  API_TOKEN = "";
+  localStorage.removeItem("algotrade_token");
+  location.reload();
+}
+
+// Show login if no token, else load data
+if (!API_TOKEN) {
+  document.getElementById("login-modal").style.display = "flex";
+} else {
+  setTimeout(loadDashboard, 500);
+}
+
+// ── Page routing ─────────────────────────────────────────────
 function showPage(page) {
   document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
   document.getElementById('page-' + page).style.display = 'block';
@@ -777,12 +910,4 @@ const signals = [
 let si = 0;
 setInterval(() => {
   si = (si + 1) % signals.length;
-  const bar = document.getElementById('live-signal-bar');
-  if (bar.style.display !== 'none') {
-    bar.querySelector('.signal-label').textContent = signals[si].label;
-    bar.querySelector('.signal-sub').textContent   = signals[si].sub;
-  }
-}, 5000);
-</script>
-</body>
-</html>
+  const bar = document.getElementById('live-signal-b
